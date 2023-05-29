@@ -1,0 +1,365 @@
+<html lang="en">
+<head>
+    <title>Wastewater Funding Needs</title>
+    <meta charset="UTF-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+
+    <!-- Materialize -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"/> 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+	<!-- icons -->
+	 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- ArcGIS API for Javascript css + js -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.26/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.26/"></script>
+ 
+    <!-- My CSS -->
+    <link rel="stylesheet" href="wwdb.css"/>
+</head>
+
+<body onresize="mapSize()", onload="mapSize()">
+	
+	<!-- Title bar -->
+	<nav class="blue-grey">
+		<div class="nav-wrapper blue-grey">
+			<!-- Title bar for desktop; Hidden for mobile and tablet -->
+			<span class="hide-on-med-and-down"><a class="brand-logo"><b>Hudson River Watershed Wastewater Infrastructure Funding Needs</b></a></span> 
+			<!-- Title bar for mobile and tablet. Hidden for desktop -->
+			<span class="hide-on-large-only"><a class="brand-logo center sidenav-trigger" data-target="slide-out"><i class="large material-icons">info</i></a></span>
+		</div>
+	</nav>
+	
+	<!-- Sidebar, shows on mobile and tablets -->
+	<div id="slide-out" class="sidenav">
+        <p><b>Hudson River Watershed Wastewater Infrastructure Funding Needs</b></p>
+		<p>
+			The Clean Water Act set the goal of "swimmable" water for the United States, and provided funding to construct the wastewater infrastructure 
+			needed to achieve it. 
+			Today, fifty years later, much of this infrastructure has aged past its intended lifespan, resulting in sewage pollution that makes rivers and streams unsafe for recreation.
+		</p>
+		<p>
+			To restore water quality and keep pace with climate change, this essential infrastucture needs repair.
+			This map summarizes wastewater infrastructure investment needs for the Hudson River Watershed, by legislative district and subwatershed.
+		</p>
+		<p class="flow-text">
+			<b>For more information</b>, read this 
+			<a href="https://www.riverkeeper.org/blogs/water-quality-blogs/more-than-2-billion-needed-to-fix-hudson-river-watershed-sewers/">
+			blog post at Riverkeeper.org</a>.
+		</p>
+		<p class="flow-text">
+			Data sources:<br>
+			<a href="https://data.gis.ny.gov/search?q=legislative">Legislative District Boundaries</a><br>
+			<a href="https://www.usgs.gov/national-hydrography/watershed-boundary-dataset">Watershed Boundaries</a><br>
+			<a href="https://efc.ny.gov/cw-iup">Project Funding Needs</a>
+		</p>
+		<p class="flow-text">
+			<b>Data analysis and map by </b><a href="https://itsjenepstein.github.io/">Jen Epstein</a>
+		</p>
+		<p>
+		<a class="sidenav-close"><i class="material-icons">exit_to_app</i></a>
+		</p>
+    </div>
+	
+    <div class="wide-container"> <!-- Start of Materialize container -->
+		<div class="row brown lighten-5"> <!-- Row for the side panel and main map -->
+			<div id="control-panel" class="col l3 hide-on-med-and-down"> <!-- side panel div visible only on desktop; content moves to sidebar on tablet and mobile -->
+                <p class="flow-text big">
+					The Clean Water Act set the goal of "swimmable" water for the United States, and provided funding to construct the wastewater infrastructure 
+					needed to achieve it. 
+					Today, fifty years later, much of this infrastructure has aged past its intended lifespan, resulting in sewage pollution that makes rivers and streams unsafe for recreation.
+				</p>
+				<p>
+					To restore water quality and keep pace with climate change, this essential infrastucture needs repair.
+					This map summarizes wastewater infrastructure investment needs for the Hudson River Watershed, by legislative district and subwatershed.
+				</p>
+				<p class="flow-text">
+					<b>For more information</b>, read this 
+					<a href="https://www.riverkeeper.org/blogs/water-quality-blogs/more-than-2-billion-needed-to-fix-hudson-river-watershed-sewers/">
+					blog post at Riverkeeper.org</a>.
+				</p>
+                <p class="flow-text">
+					Data sources:<br>
+					<a href="https://data.gis.ny.gov/search?q=legislative">Legislative District Boundaries</a><br>
+					<a href="https://www.usgs.gov/national-hydrography/watershed-boundary-dataset">Watershed Boundaries</a><br>
+					<a href="https://efc.ny.gov/cw-iup">Project Funding Needs</a></p>
+				<p class="flow-text">
+					<b>Data analysis and map by </b><a href="https://jenniferlepstein.github.io/">Jen Epstein</a>
+				</p>
+			</div>
+            <div id="mapView" class="col s12 l9" height="500px">
+			</div>
+        </div> <!-- End row for the side panel and main map -->
+	</div> <!-- End Materialize container -->
+
+<script>	
+	// Function to activate sidebar
+	document.addEventListener('DOMContentLoaded', function() {
+       var elems = document.querySelectorAll('.sidenav');
+       var instances = M.Sidenav.init(elems);
+    });
+	
+	// Esri API key
+	const apiKey = "AAPK29c5ca172b56494abafb5222d94935b1AdTk7oHDpfqvylDsNFxRI2MVOFkbgHLCwf29vWgVRJvw2jluMB2UIaaoF5t4SVnD";
+	
+	// Function to get available window size and use it to calculate size of map div so that it fills window height
+    // This is necessary because map div doesn't work with a percentage based height
+    // Variable wih = window inner height; mapHeight is calculated by subtracting the navbar height (65)
+	function mapSize() { 
+		const wih = window.innerHeight;
+        const mapHeight = wih - 65;
+        document.getElementById("mapView").style.height = mapHeight + 'px';
+    };
+	
+	// ArcGIS SDK dependencies and callback functions
+    require([
+        "esri/Map",
+        "esri/views/MapView", 
+        "esri/widgets/LayerList", 
+        "esri/widgets/LayerList/ListItem", 
+		"esri/Basemap",
+        "esri/widgets/BasemapToggle",
+        "esri/layers/FeatureLayer",
+        "esri/PopupTemplate"
+    ], function(
+        Map,
+        MapView, 
+        LayerList, 
+		ListItem,
+        Basemap,
+        BasemapToggle,
+        FeatureLayer, 
+        PopupTemplate
+    ) {        
+	
+	// Create the map
+	const map = new Map({
+		basemap: "streets-relief-vector"
+	});
+	
+	// Add the map to a MapView
+	const mapView = new MapView({
+		container: "mapView", 
+		map: map,
+		center: [-73.753006, 42.649119],
+		zoom: 7
+	});
+        
+	// Add layer list with legend
+	const layerList = new LayerList({
+		view: mapView,
+		listItemCreatedFunction: function(event) {
+			const item = event.item;
+			item.panel = {
+				content: "legend",
+				open: false
+			};
+		}
+	});
+	mapView.ui.add(layerList, "top-right");
+        
+	// Add basemap toggle widget
+	const basemapToggle = new BasemapToggle({
+		view: mapView, 
+		nextBasemap: "dark-gray-vector"
+	});
+	mapView.ui.add(basemapToggle, "bottom-right");
+        
+	// Define polygon fill color ramp for 5 classes
+	const less10 = {
+		type: "simple-fill", 
+		color: [237,248,251,0.9],
+		style: "solid",
+		outline: {
+			width: 0.2, 
+			color: [255,255,255,0.9]
+		}
+	};
+	const upto50 = {
+		type: "simple-fill", 
+		color: [179,205,227,0.9],
+		style: "solid",
+		outline: {
+			width: 0.2, 
+			color: [255,255,255,0.9]
+		}
+	};
+	const upto100 = {
+		type: "simple-fill", 
+		color: [140,150,198,0.9],
+		style: "solid",
+		outline: {
+			width: 0.2, 
+			color: [255,255,255,0.9]
+		}
+	};
+	const upto250 = {
+		type: "simple-fill", 
+		color: [136,86,167,0.9],
+		style: "solid",
+		outline: {
+			width: 0.2, 
+			color: [255,255,255,0.9]
+		}
+	};
+	const more250 = {
+		type: "simple-fill", 
+		color: [129,15,124,0.9],
+		style: "solid",
+		outline: {
+			width: 0.2, 
+			color: [255,255,255,0.9]
+		}
+	};
+	
+	// Define symbology renderer with 5 classes
+	const renderer = {
+		type: "class-breaks", 
+		field: "total_cost", 
+		legendOptions: {
+			title: "Total project cost"
+		},
+		defaultSymbol: {
+			type: "simple-fill",
+			color: "black",
+			style: "backward-diagonal",
+			outline: {
+				width: 0.5,
+				color: [50,50,50,0.2]
+			}
+		},
+		defaultLabel: "no data",
+		classBreakInfos: [
+			{
+				minValue: 0,
+				maxValue: 9999999,
+				symbol: less10,
+				label: "< $10 million"
+			},
+			{
+				minValue: 10000000,
+				maxValue: 49999999,
+				symbol: upto50,
+				label: "$10 - $50 million"
+			},
+			{
+				minValue: 50000000,
+				maxValue: 99999999,
+				symbol: upto100,
+				label: "$50 - $100 million"
+			},
+			{
+				minValue: 100000000,
+				maxValue: 249999999,
+				symbol: upto250,
+				label: "$100 - $250 million"
+			},
+			{
+				minValue: 250000000,
+				maxValue: 1000000000,
+				symbol: more250,
+				label: "> $250 million"
+			}
+		]
+	};	
+	
+	// Define popups
+	const templateSen = {
+		title: "Senate District {DISTRICT}",
+		content: [
+			{
+				type: "fields",
+				fieldInfos: [
+					{
+						fieldName: "num_projec", 
+						label: "Number of Projects",
+					},
+					{
+						fieldName: "total_cost", 
+						label: "Total Estimated Cost (millions)",
+						format: {
+							type: "integer",
+							digitSeparator: true,
+							places: 0
+						}
+					}
+				]
+			}
+		]
+	};
+	const templateAsm = {
+		title: "Assembly District {DISTRICT}",
+		content: [
+			{
+				type: "fields",
+				fieldInfos: [
+					{
+						fieldName: "num_projec", 
+						label: "Number of Projects",
+					},
+					{
+						fieldName: "total_cost", 
+						label: "Total Estimated Cost (millions)",
+						format: {
+							type: "integer",
+							digitSeparator: true,
+							places: 0
+						}
+					}
+				]
+			}
+		]
+	};
+	const templateHUC = {
+		title: "{Name} Watershed (HUC ID {HUC8})",
+		content: [
+			{
+				type: "fields",
+				fieldInfos: [
+					{
+						fieldName: "num_projec", 
+						label: "Number of Projects",
+					},
+					{
+						fieldName: "total_cost", 
+						label: "Total Estimated Cost (millions)",
+						format: {
+							type: "integer",
+							digitSeparator: true,
+							places: 0
+						}
+					}
+				]
+			}
+		]
+	};
+    // Add feature layers
+	const huc8 = new FeatureLayer({
+		url: "https://services5.arcgis.com/DB7NKEqvyKCtN8m6/arcgis/rest/services/hrw_hu8/FeatureServer/0",
+		renderer: renderer,
+		title: "Watersheds (HUC8)",
+		popupTemplate: templateHUC
+		});
+		map.layers.add(huc8);
+
+	const senate = new FeatureLayer({
+		url: "https://services5.arcgis.com/DB7NKEqvyKCtN8m6/arcgis/rest/services/nys_senate_districts/FeatureServer/0",
+		renderer: renderer,
+		title: "NYS Senate Districts",
+		popupTemplate: templateSen
+		}); 
+		map.layers.add(senate);
+        
+    const assembly = new FeatureLayer({
+		url: "https://services5.arcgis.com/DB7NKEqvyKCtN8m6/arcgis/rest/services/nys_assembly_districts/FeatureServer/0",
+		renderer: renderer,
+		title: "NYS Assembly Districts",
+		popupTemplate: templateAsm
+		});
+		map.layers.add(assembly);
+	});
+</script>
+</body>
+</html>
+
