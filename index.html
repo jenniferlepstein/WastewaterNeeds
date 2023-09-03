@@ -126,7 +126,8 @@
 		"esri/Basemap",
         "esri/widgets/BasemapToggle",
         "esri/layers/FeatureLayer",
-        "esri/PopupTemplate"
+        "esri/PopupTemplate",
+        "esri/widgets/Expand"
     ], function(
         Map,
         MapView, 
@@ -135,7 +136,8 @@
         Basemap,
         BasemapToggle,
         FeatureLayer, 
-        PopupTemplate
+        PopupTemplate, 
+		Expand
     ) {        
 	
 	// Create the map
@@ -151,18 +153,16 @@
 		zoom: 7
 	});
         
-	// Add layer list with legend
-	const layerList = new LayerList({
-		view: mapView,
-		listItemCreatedFunction: function(event) {
-			const item = event.item;
-			item.panel = {
-				content: "legend",
-				open: false
-			};
-		}
-	});
-	mapView.ui.add(layerList, "top-right");
+	// Add a layer list
+    const layerList = new LayerList({
+        view: mapView
+    });
+    const layerListExpand = new Expand({
+        expandIcon: "layers", 
+        view: mapView, 
+        content: layerList
+    });
+    mapView.ui.add(layerListExpand, "top-right");
         
 	// Add basemap toggle widget
 	const basemapToggle = new BasemapToggle({
